@@ -15,7 +15,12 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
     
-    return NextResponse.json(Task.fromJSON(task))
+    // Parse the tags JSON string back to array when returning the task
+    const taskWithParsedTags = {
+      ...task,
+      tags: JSON.parse(task.tags)
+    }
+    return NextResponse.json(Task.fromJSON(taskWithParsedTags))
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 })
   }
@@ -36,7 +41,7 @@ export async function PUT(
       description: taskJson.description,
       priority: taskJson.priority,
       status: taskJson.status,
-      tags: taskJson.tags,
+      tags: JSON.stringify(taskJson.tags), // Convert tags array to JSON string
       estimatedTime: taskJson.estimatedTime,
       actualTime: taskJson.actualTime,
       updatedAt: new Date(taskJson.updatedAt),
@@ -48,7 +53,12 @@ export async function PUT(
       data: prismaData
     })
     
-    return NextResponse.json(Task.fromJSON(updatedTask))
+    // Parse the tags JSON string back to array when returning the updated task
+    const taskWithParsedTags = {
+      ...updatedTask,
+      tags: JSON.parse(updatedTask.tags)
+    }
+    return NextResponse.json(Task.fromJSON(taskWithParsedTags))
   } catch (error) {
     console.error('Failed to update task:', error)
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })

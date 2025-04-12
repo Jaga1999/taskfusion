@@ -5,7 +5,12 @@ import { Task } from '@/models/Task'
 export async function GET() {
   try {
     const tasks = await prisma.task.findMany()
-    return NextResponse.json(tasks.map(task => Task.fromJSON(task)))
+    // Parse the tags JSON string back to array when returning tasks
+    const tasksWithParsedTags = tasks.map(task => ({
+      ...task,
+      tags: JSON.parse(task.tags)
+    }))
+    return NextResponse.json(tasksWithParsedTags.map(task => Task.fromJSON(task)))
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
   }
@@ -24,7 +29,7 @@ export async function POST(request: Request) {
       description: taskJson.description,
       priority: taskJson.priority,
       status: taskJson.status,
-      tags: taskJson.tags,
+      tags: JSON.stringify(taskJson.tags), // Convert tags array to JSON string
       estimatedTime: taskJson.estimatedTime,
       actualTime: taskJson.actualTime,
       createdAt: new Date(taskJson.createdAt),
@@ -33,7 +38,12 @@ export async function POST(request: Request) {
     }
     
     const createdTask = await prisma.task.create({ data: prismaData })
-    return NextResponse.json(Task.fromJSON(createdTask))
+    // Parse the tags JSON string back to array when returning the created task
+    const taskWithParsedTags = {
+      ...createdTask,
+      tags: JSON.parse(createdTask.tags)
+    }
+    return NextResponse.json(Task.fromJSON(taskWithParsedTags))
   } catch (error) {
     console.error('Failed to create task:', error)
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 })
