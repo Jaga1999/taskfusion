@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Task {
+  id            String    @id
+  title         String
+  description   String    @default("")
+  priority      String    @default("medium")
+  status        String    @default("todo")
+  tags          String    @default("[]") // Stored as JSON string
+  estimatedTime Int       @default(0)
+  actualTime    Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  completedAt   DateTime?
+}
