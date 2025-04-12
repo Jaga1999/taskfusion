@@ -6,46 +6,38 @@ import { Button } from '@/components/ui/button'
 import { Undo2, Redo2 } from 'lucide-react'
 import { ActivityLogService } from '@/services/ActivityLogService'
 import { Command } from '@/models/Command'
+import { useActivityLogStore } from '@/services/ActivityLogService'
 
 export function ActivityLog() {
-  const [canUndo, setCanUndo] = useState(false)
-  const [canRedo, setCanRedo] = useState(false)
-  const [history, setHistory] = useState<Command[]>([])
-  
-  useEffect(() => {
-    const activityLog = ActivityLogService.getInstance()
-    
-    const updateState = () => {
-      setCanUndo(activityLog.canUndo())
-      setCanRedo(activityLog.canRedo())
-      setHistory(activityLog.getHistory())
-    }
+  const { activities, canUndo, canRedo, updateState } = useActivityLogStore()
+  const activityLog = ActivityLogService.getInstance()
 
-    // Initial state
+  useEffect(() => {
+    // Load initial activities
     updateState()
 
-    // Subscribe to changes
-    const unsubscribe = activityLog.subscribe(updateState)
-    return () => unsubscribe()
-  }, [])
+    // Set up listener for new activities
+    const unsubscribe = activityLog.onActivityAdded(() => {
+      updateState()
+    })
 
-  const handleUndo = () => {
-    const activityLog = ActivityLogService.getInstance()
-    if (activityLog.canUndo()) {
-      activityLog.undo()
+    return () => {
+      if (unsubscribe) unsubscribe()
     }
+  }, [updateState])
+
+  const handleUndo = async () => {
+    await activityLog.undo()
+    updateState()
   }
 
-  const handleRedo = () => {
-    const activityLog = ActivityLogService.getInstance()
-    if (activityLog.canRedo()) {
-      activityLog.redo()
-    }
+  const handleRedo = async () => {
+    await activityLog.redo()
+    updateState()
   }
 
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString()
+  const formatTimestamp = (date: Date) => {
+    return date.toLocaleString()
   }
 
   return (
@@ -74,22 +66,17 @@ export function ActivityLog() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          {history.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No activity yet</p>
-          ) : (
-            history.map((command, index) => (
-              <div 
-                key={index}
-                className="text-sm flex items-center justify-between py-1 border-b last:border-0"
-              >
-                <span>{command.description}</span>
-                <span className="text-muted-foreground">
-                  {formatTimestamp(command.timestamp)}
-                </span>
+        <div className="space-y-4">
+          {activities.map((command: Command) => (
+            <div key={command.getTimestamp().getTime()} className="flex items-start justify-between p-4 border rounded-lg">
+              <div className="space-y-1">
+                <span>{command.getDescription()}</span>
               </div>
-            ))
-          )}
+              <time className="text-sm text-muted-foreground">
+                {formatTimestamp(command.getTimestamp())}
+              </time>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>

@@ -161,7 +161,12 @@ const createWindow = (): void => {
     }
   });
 
-  mainWindow.loadURL('http://localhost:3000'); // Load the Next.js app
+  // Load the default URL
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:3000/tasks')
+  } else {
+    mainWindow.loadURL(`file://${path.join(__dirname, '../out/index.html')}#/tasks`)
+  }
 
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {

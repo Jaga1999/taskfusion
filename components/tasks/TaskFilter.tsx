@@ -23,19 +23,20 @@ export function TaskFilter() {
   const addTag = (tag: string) => {
     const trimmedTag = tag.trim()
     if (!trimmedTag) return
-
-    implementation.setFilter(prev => ({
-      ...prev,
-      tags: [...(prev.tags || []), trimmedTag]
-    }))
+    
+    const currentTags = filter.tags || []
+    implementation.setFilter({
+      ...filter,
+      tags: [...currentTags, trimmedTag]
+    })
     setTagInput('')
   }
 
   const removeTag = (tagToRemove: string) => {
-    implementation.setFilter(prev => ({
-      ...prev,
-      tags: prev.tags?.filter(tag => tag !== tagToRemove)
-    }))
+    implementation.setFilter({
+      ...filter,
+      tags: filter.tags?.filter((tag: string) => tag !== tagToRemove)
+    })
   }
 
   const clearFilters = () => {

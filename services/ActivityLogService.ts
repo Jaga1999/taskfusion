@@ -5,6 +5,7 @@ export class ActivityLogService {
   private static instance: ActivityLogService;
   private commands: Command[] = [];
   private currentIndex: number = -1;
+  private listeners: ((activity: Command) => void)[] = [];
 
   private constructor() {}
 
@@ -25,6 +26,9 @@ export class ActivityLogService {
     await command.execute();
     this.commands.push(command);
     this.currentIndex++;
+    
+    // Notify listeners
+    this.listeners.forEach(listener => listener(command));
   }
 
   public async undo(): Promise<void> {
@@ -51,7 +55,7 @@ export class ActivityLogService {
     return this.currentIndex < this.commands.length - 1;
   }
 
-  public getHistory(): Command[] {
+  public getActivities(): Command[] {
     return [...this.commands];
   }
 
@@ -63,14 +67,22 @@ export class ActivityLogService {
     this.commands = [];
     this.currentIndex = -1;
   }
+
+  public onActivityAdded(callback: (activity: Command) => void): () => void {
+    this.listeners.push(callback);
+    return () => {
+      this.listeners = this.listeners.filter(listener => listener !== callback);
+    };
+  }
 }
 
 // Create Zustand store for ActivityLog state
 interface ActivityLogState {
   canUndo: boolean;
   canRedo: boolean;
-  history: Command[];
+  activities: Command[];
   currentIndex: number;
+  updateState: () => void;
 }
 
 export const useActivityLogStore = create<ActivityLogState>((set) => {
@@ -79,14 +91,14 @@ export const useActivityLogStore = create<ActivityLogState>((set) => {
   return {
     canUndo: service.canUndo(),
     canRedo: service.canRedo(),
-    history: service.getHistory(),
+    activities: service.getActivities(),
     currentIndex: service.getCurrentIndex(),
     
     // Update state after each operation
     updateState: () => set({
       canUndo: service.canUndo(),
       canRedo: service.canRedo(),
-      history: service.getHistory(),
+      activities: service.getActivities(),
       currentIndex: service.getCurrentIndex()
     })
   };

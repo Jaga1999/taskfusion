@@ -64,11 +64,11 @@ export function TaskList() {
     if (!quickAddTitle.trim()) return
     setLoading('quickAddTask', true)
     try {
-      await addTask({
+      await addTask(new Task({
         title: quickAddTitle,
         priority: TaskPriority.MEDIUM,
         status: TaskStatus.TODO
-      })
+      }))
       setQuickAddTitle('')
       setIsQuickAddOpen(false)
     } finally {
@@ -112,11 +112,14 @@ export function TaskList() {
   const handleSubmit = async () => {
     setLoading('createTask', true)
     try {
-      await addTask({
-        ...formData,
+      await addTask(new Task({
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        status: formData.status,
         tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
         estimatedTime: formData.estimatedTime ? parseInt(formData.estimatedTime) : undefined
-      })
+      }))
       setIsDialogOpen(false)
       setFormData({
         title: '',
