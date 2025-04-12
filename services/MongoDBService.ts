@@ -25,7 +25,8 @@ const taskSchema = new mongoose.Schema({
   completedAt: { type: Date, default: null }
 });
 
-const TaskModel = mongoose.model('Task', taskSchema);
+// Prevent model recompilation error
+const TaskModel = mongoose.models.Task || mongoose.model('Task', taskSchema);
 
 export class MongoDBService extends DatabaseService {
   private connected: boolean = false;

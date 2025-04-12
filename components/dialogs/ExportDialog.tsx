@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { ExportFormat } from "@/services/ExportService"
 import { useTaskStore } from "@/store/TaskStore"
 
@@ -17,8 +17,14 @@ interface ExportDialogProps {
 export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
   const [format, setFormat] = useState<ExportFormat>('xlsx')
   const [includeCharts, setIncludeCharts] = useState(true)
-  // Use a stable selector to avoid infinite loop
-  const tasks = useTaskStore(useCallback(state => state.implementation.getFilteredTasks(), []))
+  
+  // Get the getFilteredTasks function directly from the store
+  const getFilteredTasks = useTaskStore(
+    useCallback(state => state.implementation.getFilteredTasks, [])
+  )
+  
+  // Memoize the tasks array
+  const tasks = useMemo(() => getFilteredTasks(), [getFilteredTasks])
 
   const handleExport = async () => {
     const ExportService = (await import('@/services/ExportService')).ExportService;
