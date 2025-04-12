@@ -13,7 +13,6 @@ class ThemeStoreImplementation {
 
   constructor(initialMode: ThemeMode = 'light') {
     this.mode = initialMode;
-    this.applyTheme(initialMode);
   }
 
   public getMode(): ThemeMode {
@@ -21,16 +20,9 @@ class ThemeStoreImplementation {
   }
 
   public setTheme(mode: ThemeMode): void {
+    if (typeof window === 'undefined') return; // Skip during SSR
+    
     this.mode = mode;
-    this.applyTheme(mode);
-  }
-
-  public toggleTheme(): void {
-    const newMode = this.mode === 'light' ? 'dark' : 'light';
-    this.setTheme(newMode);
-  }
-
-  private applyTheme(mode: ThemeMode): void {
     const root = document.documentElement;
     const colors = themeConfig[mode];
 
@@ -45,6 +37,11 @@ class ThemeStoreImplementation {
     } else {
       root.classList.remove('dark');
     }
+  }
+
+  public toggleTheme(): void {
+    const newMode = this.mode === 'light' ? 'dark' : 'light';
+    this.setTheme(newMode);
   }
 
   private kebabCase(str: string): string {
@@ -62,8 +59,8 @@ export const useThemeStore = create(
     {
       name: 'theme-storage',
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Re-apply theme on page load
+        if (state && typeof window !== 'undefined') {
+          // Re-apply theme on page load, but only on client side
           const mode = state.implementation.getMode();
           state.implementation.setTheme(mode);
         }

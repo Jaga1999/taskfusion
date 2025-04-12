@@ -1,19 +1,29 @@
-"use strict";
+import { contextBridge, ipcRenderer } from 'electron';
 class PreloadScript {
     constructor() {
         this.platform = process.platform;
     }
-    // Expose platform to the renderer process
-    exposePlatform() {
-        window.electron = {
-            platform: this.platform
-        };
-    }
-    // Initialize preload script
     init() {
-        this.exposePlatform();
+        this.exposeAPI();
+    }
+    exposeAPI() {
+        contextBridge.exposeInMainWorld('electron', {
+            platform: this.platform,
+            onOpenExportDialog: (callback) => {
+                ipcRenderer.on('open-export-dialog', callback);
+                return () => ipcRenderer.removeListener('open-export-dialog', callback);
+            },
+            onStartTimer: (callback) => {
+                ipcRenderer.on('start-timer', callback);
+                return () => ipcRenderer.removeListener('start-timer', callback);
+            },
+            onToggleTimer: (callback) => {
+                ipcRenderer.on('toggle-timer', callback);
+                return () => ipcRenderer.removeListener('toggle-timer', callback);
+            }
+        });
     }
 }
-// Instantiate and initialize the PreloadScript class
+// Initialize the preload script
 const preloadScript = new PreloadScript();
 preloadScript.init();
