@@ -15,6 +15,7 @@ interface TimerStore {
   resumeTimer: () => void;
   resetTimer: () => void;
   getFormattedTime: () => string;
+  setupElectronListeners: () => void;
 }
 
 export const useTimerStore = create<TimerStore>((set, get) => {
@@ -79,6 +80,34 @@ export const useTimerStore = create<TimerStore>((set, get) => {
 
     getFormattedTime: () => {
       return Timer.formatTime(timer.getRemainingTime());
+    },
+
+    setupElectronListeners: () => {
+      if (typeof window !== 'undefined' && window.electron) {
+        // Handle start timer from tray
+        window.electron.onStartTimer(() => {
+          const { timer } = get();
+          if (timer.getState() === TimerState.IDLE) {
+            get().startTimer();
+          }
+        });
+
+        // Handle toggle timer from global shortcut
+        window.electron.onToggleTimer(() => {
+          const { timer } = get();
+          switch (timer.getState()) {
+            case TimerState.IDLE:
+              get().startTimer();
+              break;
+            case TimerState.RUNNING:
+              get().pauseTimer();
+              break;
+            case TimerState.PAUSED:
+              get().resumeTimer();
+              break;
+          }
+        });
+      }
     }
   };
 });

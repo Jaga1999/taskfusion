@@ -1,12 +1,12 @@
-import { app, BrowserWindow, Menu, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, dialog, Tray, globalShortcut, nativeImage } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import axios from 'axios';
 
-// Convert the `import.meta.url` to `__dirname`
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 
 // Function to check if Next.js server is running
 const isNextJsRunning = async (): Promise<boolean> => {
@@ -19,9 +19,62 @@ const isNextJsRunning = async (): Promise<boolean> => {
   }
 };
 
+const createTray = () => {
+  const icon = nativeImage.createFromPath(path.join(process.cwd(), 'public', 'window.svg'));
+  tray = new Tray(icon);
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show TaskFusion',
+      click: () => mainWindow?.show()
+    },
+    {
+      label: 'Start Timer',
+      click: () => mainWindow?.webContents.send('start-timer')
+    },
+    {
+      label: 'Export Tasks...',
+      click: () => mainWindow?.webContents.send('open-export-dialog')
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => app.quit()
+    }
+  ]);
+
+  tray.setToolTip('TaskFusion');
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    if (mainWindow?.isVisible()) {
+      mainWindow.hide();
+    } else {
+      mainWindow?.show();
+    }
+  });
+};
+
+const registerShortcuts = () => {
+  // Global shortcut to toggle window visibility
+  globalShortcut.register('Alt+Shift+T', () => {
+    if (mainWindow?.isVisible()) {
+      mainWindow.hide();
+    } else {
+      mainWindow?.show();
+      mainWindow?.focus();
+    }
+  });
+
+  // Global shortcut to start/pause timer
+  globalShortcut.register('Alt+Shift+P', () => {
+    mainWindow?.webContents.send('toggle-timer');
+  });
+};
+
 // Create application menu
 const createMenu = () => {
-  const template = [
+  const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: 'File',
       submenu: [
@@ -81,6 +134,13 @@ const createWindow = (): void => {
 
   mainWindow.loadURL('http://localhost:3000'); // Load the Next.js app
 
+  mainWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -92,6 +152,8 @@ app.whenReady().then(async () => {
   if (isRunning) {
     createWindow(); // Open window if Next.js is running
     createMenu(); // Create application menu
+    createTray(); // Create tray icon
+    registerShortcuts(); // Register global shortcuts
   } else {
     console.log('Next.js server is not running. Please start the server.');
   }
@@ -102,6 +164,12 @@ app.whenReady().then(async () => {
       createMenu();
     }
   });
+});
+
+// Cleanup when quitting
+app.on('before-quit', () => {
+  app.isQuitting = true;
+  globalShortcut.unregisterAll();
 });
 
 // Quit app when all windows are closed (except on macOS)
