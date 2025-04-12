@@ -20,6 +20,7 @@ interface TaskState {
     deleteTask: (taskId: string) => Promise<void>
     setFilter: (filter: Partial<TaskState['filter']>) => void
     loadTasks: () => Promise<void>
+    getEfficiencyScore: (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => number
   }
 }
 
@@ -131,6 +132,38 @@ export const useTaskStore = create<TaskState>((set, get) => {
       loadTasks: async () => {
         const tasks = await dbManager.getAllTasks()
         set({ tasks })
+      },
+      getEfficiencyScore: (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
+        const tasks = get().tasks
+        const now = new Date()
+        
+        // Get start date based on period
+        const getStartDate = () => {
+          switch (period) {
+            case 'daily':
+              return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+            case 'weekly':
+              const weekStart = new Date(now)
+              weekStart.setDate(now.getDate() - now.getDay())
+              return weekStart
+            case 'monthly':
+              return new Date(now.getFullYear(), now.getMonth(), 1)
+            case 'yearly':
+              return new Date(now.getFullYear(), 0, 1)
+          }
+        }
+
+        const startDate = getStartDate()
+        const periodTasks = tasks.filter(task => {
+          const taskDate = task.getCreatedAt()
+          return taskDate >= startDate && taskDate <= now
+        })
+
+        if (periodTasks.length === 0) return 0
+
+        // Calculate average efficiency
+        const totalEfficiency = periodTasks.reduce((sum, task) => sum + task.calculateEfficiency(), 0)
+        return totalEfficiency / periodTasks.length
       }
     }
   }

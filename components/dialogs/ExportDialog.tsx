@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { ExportFormat } from "@/services/ExportService"
 import { useTaskStore } from "@/store/TaskStore"
 
@@ -17,7 +17,8 @@ interface ExportDialogProps {
 export function ExportDialog({ open, onOpenChange }: ExportDialogProps) {
   const [format, setFormat] = useState<ExportFormat>('xlsx')
   const [includeCharts, setIncludeCharts] = useState(true)
-  const tasks = useTaskStore(state => state.implementation.getFilteredTasks())
+  // Use a stable selector to avoid infinite loop
+  const tasks = useTaskStore(useCallback(state => state.implementation.getFilteredTasks(), []))
 
   const handleExport = async () => {
     const ExportService = (await import('@/services/ExportService')).ExportService;
