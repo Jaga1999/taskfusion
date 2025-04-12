@@ -1,32 +1,7 @@
 import mongoose from 'mongoose';
 import { DatabaseService, DatabaseConfig } from './DatabaseService';
-import { Task, TaskPriority, TaskStatus } from '../models/Task';
-
-// Mongoose Schema
-const taskSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  title: { type: String, required: true },
-  description: { type: String, default: '' },
-  priority: { 
-    type: String, 
-    enum: Object.values(TaskPriority),
-    default: TaskPriority.MEDIUM 
-  },
-  status: { 
-    type: String, 
-    enum: Object.values(TaskStatus),
-    default: TaskStatus.TODO 
-  },
-  tags: [{ type: String }],
-  estimatedTime: { type: Number, default: 0 },
-  actualTime: { type: Number, default: 0 },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-  completedAt: { type: Date, default: null }
-});
-
-// Prevent model recompilation error
-const TaskModel = mongoose.models.Task || mongoose.model('Task', taskSchema);
+import { Task } from '../models/Task';
+import { getTaskModel } from '../models/mongoose/TaskModel';
 
 export class MongoDBService extends DatabaseService {
   private connected: boolean = false;
@@ -58,22 +33,26 @@ export class MongoDBService extends DatabaseService {
   }
 
   async getAllTasks(): Promise<Task[]> {
+    const TaskModel = getTaskModel();
     const documents = await TaskModel.find().sort({ updatedAt: -1 });
     return documents.map(doc => this.documentToTask(doc));
   }
 
   async getTaskById(id: string): Promise<Task | null> {
+    const TaskModel = getTaskModel();
     const document = await TaskModel.findOne({ id });
     return document ? this.documentToTask(document) : null;
   }
 
   async createTask(task: Task): Promise<Task> {
+    const TaskModel = getTaskModel();
     const document = new TaskModel(task.toJSON());
     await document.save();
     return this.documentToTask(document);
   }
 
   async updateTask(task: Task): Promise<Task> {
+    const TaskModel = getTaskModel();
     const document = await TaskModel.findOneAndUpdate(
       { id: task.getId() },
       task.toJSON(),
@@ -84,6 +63,7 @@ export class MongoDBService extends DatabaseService {
   }
 
   async deleteTask(id: string): Promise<boolean> {
+    const TaskModel = getTaskModel();
     const result = await TaskModel.deleteOne({ id });
     return result.deletedCount === 1;
   }

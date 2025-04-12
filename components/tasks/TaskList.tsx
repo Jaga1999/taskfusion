@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -29,12 +29,17 @@ type SortOption = 'priority' | 'created' | 'updated' | 'title';
 type SortDirection = 'asc' | 'desc';
 
 export function TaskList() {
-  const { tasks, addTask, updateTask, deleteTask } = useTaskStore(state => ({
-    tasks: state.implementation.getFilteredTasks(),
-    addTask: state.implementation.addTask,
-    updateTask: state.implementation.updateTask,
-    deleteTask: state.implementation.deleteTask
-  }))
+  // Get store implementation with memoized selector
+  const storeImplementation = useTaskStore(
+    useCallback(state => state.implementation, [])
+  )
+  
+  // Memoize the filtered tasks
+  const tasks = useMemo(
+    () => storeImplementation.getFilteredTasks(),
+    [storeImplementation]
+  )
+
   const { setLoading, isLoading } = useLoadingStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
@@ -64,7 +69,7 @@ export function TaskList() {
     if (!quickAddTitle.trim()) return
     setLoading('quickAddTask', true)
     try {
-      await addTask(new Task({
+      await storeImplementation.addTask(new Task({
         title: quickAddTitle,
         priority: TaskPriority.MEDIUM,
         status: TaskStatus.TODO
@@ -112,7 +117,7 @@ export function TaskList() {
   const handleSubmit = async () => {
     setLoading('createTask', true)
     try {
-      await addTask(new Task({
+      await storeImplementation.addTask(new Task({
         title: formData.title,
         description: formData.description,
         priority: formData.priority,
@@ -137,7 +142,7 @@ export function TaskList() {
   const handleDelete = async (taskId: string) => {
     setLoading(`deleteTask-${taskId}`, true)
     try {
-      await deleteTask(taskId)
+      await storeImplementation.deleteTask(taskId)
     } finally {
       setLoading(`deleteTask-${taskId}`, false)
     }
@@ -146,7 +151,7 @@ export function TaskList() {
   const handleStatusChange = async (taskId: string, status: TaskStatus) => {
     setLoading(`updateTask-${taskId}`, true)
     try {
-      await updateTask(taskId, { status } as Partial<Task>)
+      await storeImplementation.updateTask(taskId, { status } as Partial<Task>)
     } finally {
       setLoading(`updateTask-${taskId}`, false)
     }

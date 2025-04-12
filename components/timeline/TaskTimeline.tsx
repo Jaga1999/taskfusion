@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Timeline from 'react-calendar-timeline'
-import 'react-calendar-timeline/lib/Timeline.css'
+import 'react-calendar-timeline/style.css'
 import moment from 'moment'
 import { Task } from '@/models/Task'
 import { useTaskStore } from '@/store/TaskStore'
