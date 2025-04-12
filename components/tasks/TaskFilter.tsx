@@ -67,14 +67,14 @@ export function TaskFilter() {
       <div className="space-y-4">
         <div>
           <Select
-            value={filter?.status || ""}
-            onValueChange={(value) => implementation.setFilter({ status: value as TaskStatus })}
+            value={filter?.status || "ALL"}
+            onValueChange={(value) => implementation.setFilter({ status: value === "ALL" ? undefined : value as TaskStatus })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Statuses</SelectItem>
+              <SelectItem value="ALL">All Statuses</SelectItem>
               {Object.values(TaskStatus).map(status => (
                 <SelectItem key={status} value={status}>
                   {status.split('_').map(word => 
@@ -87,14 +87,14 @@ export function TaskFilter() {
         </div>
         <div>
           <Select
-            value={filter?.priority || ""}
-            onValueChange={(value) => implementation.setFilter({ priority: value as TaskPriority })}
+            value={filter?.priority || "ALL"}
+            onValueChange={(value) => implementation.setFilter({ priority: value === "ALL" ? undefined : value as TaskPriority })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Filter by priority" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Priorities</SelectItem>
+              <SelectItem value="ALL">All Priorities</SelectItem>
               {Object.values(TaskPriority).map(priority => (
                 <SelectItem key={priority} value={priority}>
                   {priority.charAt(0).toUpperCase() + priority.slice(1)}
@@ -122,7 +122,7 @@ export function TaskFilter() {
               {filter.tags.map(tag => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-secondary text-secondary-foreground"
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground"
                 >
                   {tag}
                   <button
@@ -130,7 +130,6 @@ export function TaskFilter() {
                     className="hover:text-destructive"
                   >
                     <X className="h-3 w-3" />
-                    <span className="sr-only">Remove {tag} tag</span>
                   </button>
                 </span>
               ))}

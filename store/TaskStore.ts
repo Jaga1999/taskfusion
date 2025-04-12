@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import { Task, TaskPriority, TaskStatus } from '../models/Task'
-import { DatabaseService } from '../services/DatabaseService'
 import { ActivityLogService } from '../services/ActivityLogService'
-import { DatabaseManager } from '../services/DatabaseManager'
 
 interface TaskState {
   tasks: Task[]
@@ -25,7 +23,6 @@ interface TaskState {
 }
 
 export const useTaskStore = create<TaskState>((set, get) => {
-  const dbManager = DatabaseManager.getInstance()
   const activityLog = ActivityLogService.getInstance()
 
   return {
@@ -65,19 +62,33 @@ export const useTaskStore = create<TaskState>((set, get) => {
           tags: taskData.getTags?.() || [],
           estimatedTime: taskData.getEstimatedTime?.(),
         })
-        
-        await dbManager.createTask(task)
-        await activityLog.executeCommand({
-          execute: async () => {},
-          undo: async () => {},
-          redo: async () => {},
-          getDescription: () => `Create task: ${task.getTitle()}`,
-          getTimestamp: () => new Date()
-        })
-        
-        set(state => ({
-          tasks: [...state.tasks, task]
-        }))
+
+        try {
+          const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(task.toJSON())
+          })
+
+          if (!response.ok) throw new Error('Failed to create task')
+          
+          const createdTask = Task.fromJSON(await response.json())
+          
+          await activityLog.executeCommand({
+            execute: async () => {},
+            undo: async () => {},
+            redo: async () => {},
+            getDescription: () => `Create task: ${createdTask.getTitle()}`,
+            getTimestamp: () => new Date()
+          })
+
+          set(state => ({
+            tasks: [...state.tasks, createdTask]
+          }))
+        } catch (error) {
+          console.error('Failed to create task:', error)
+          throw error
+        }
       },
       updateTask: async (taskId: string, updates: Partial<Task>) => {
         const task = get().tasks.find(t => t.getId() === taskId)
@@ -93,36 +104,58 @@ export const useTaskStore = create<TaskState>((set, get) => {
           estimatedTime: updates.getEstimatedTime?.() || task.getEstimatedTime(),
           actualTime: updates.getActualTime?.() || task.getActualTime()
         })
-        
-        await dbManager.updateTask(updatedTask)
-        await activityLog.executeCommand({
-          execute: async () => {},
-          undo: async () => {},
-          redo: async () => {},
-          getDescription: () => `Update task: ${updatedTask.getTitle()}`,
-          getTimestamp: () => new Date()
-        })
-        
-        set(state => ({
-          tasks: state.tasks.map(t => t.getId() === taskId ? updatedTask : t)
-        }))
+
+        try {
+          const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedTask.toJSON())
+          })
+
+          if (!response.ok) throw new Error('Failed to update task')
+          
+          await activityLog.executeCommand({
+            execute: async () => {},
+            undo: async () => {},
+            redo: async () => {},
+            getDescription: () => `Update task: ${updatedTask.getTitle()}`,
+            getTimestamp: () => new Date()
+          })
+
+          set(state => ({
+            tasks: state.tasks.map(t => t.getId() === taskId ? updatedTask : t)
+          }))
+        } catch (error) {
+          console.error('Failed to update task:', error)
+          throw error
+        }
       },
       deleteTask: async (taskId: string) => {
         const task = get().tasks.find(t => t.getId() === taskId)
         if (!task) return
-        
-        await dbManager.deleteTask(taskId)
-        await activityLog.executeCommand({
-          execute: async () => {},
-          undo: async () => {},
-          redo: async () => {},
-          getDescription: () => `Delete task: ${task.getTitle()}`,
-          getTimestamp: () => new Date()
-        })
-        
-        set(state => ({
-          tasks: state.tasks.filter(t => t.getId() !== taskId)
-        }))
+
+        try {
+          const response = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE'
+          })
+
+          if (!response.ok) throw new Error('Failed to delete task')
+          
+          await activityLog.executeCommand({
+            execute: async () => {},
+            undo: async () => {},
+            redo: async () => {},
+            getDescription: () => `Delete task: ${task.getTitle()}`,
+            getTimestamp: () => new Date()
+          })
+
+          set(state => ({
+            tasks: state.tasks.filter(t => t.getId() !== taskId)
+          }))
+        } catch (error) {
+          console.error('Failed to delete task:', error)
+          throw error
+        }
       },
       setFilter: (filter: Partial<TaskState['filter']>) => {
         set(state => ({
@@ -130,8 +163,16 @@ export const useTaskStore = create<TaskState>((set, get) => {
         }))
       },
       loadTasks: async () => {
-        const tasks = await dbManager.getAllTasks()
-        set({ tasks })
+        try {
+          const response = await fetch('/api/tasks')
+          if (!response.ok) throw new Error('Failed to load tasks')
+          
+          const tasks = (await response.json()).map((task: any) => Task.fromJSON(task))
+          set({ tasks })
+        } catch (error) {
+          console.error('Failed to load tasks:', error)
+          throw error
+        }
       },
       getEfficiencyScore: (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
         const tasks = get().tasks
