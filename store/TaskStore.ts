@@ -1,162 +1,98 @@
-import { create } from 'zustand';
-import { Task, TaskPriority, TaskStatus } from '../models/Task';
+import { create } from 'zustand'
+import { Task, TaskPriority, TaskStatus } from '../models/Task'
+import { DatabaseService } from '../services/DatabaseService'
+import { ActivityLogService } from '../services/ActivityLogService'
 
 interface TaskState {
-  tasks: Task[];
-  selectedTaskId: string | null;
+  tasks: Task[]
   filter: {
-    status?: TaskStatus;
-    priority?: TaskPriority;
-    tags?: string[];
-  };
+    search: string
+    status?: TaskStatus
+    priority?: TaskPriority
+    tags?: string[]
+  }
+  implementation: {
+    getTasks: () => Task[]
+    getFilteredTasks: () => Task[]
+    addTask: (taskData: Partial<Task>) => Promise<void>
+    updateTask: (taskId: string, taskData: Partial<Task>) => Promise<void>
+    deleteTask: (taskId: string) => Promise<void>
+    setFilter: (filter: Partial<TaskState['filter']>) => void
+    loadTasks: () => Promise<void>
+  }
 }
 
-class TaskStoreImplementation {
-  private state: TaskState = {
-    tasks: [],
-    selectedTaskId: null,
-    filter: {}
-  };
-
-  // Task CRUD operations
-  public addTask(taskData: {
-    title: string;
-    description?: string;
-    priority?: TaskPriority;
-    status?: TaskStatus;
-    tags?: string[];
-    estimatedTime?: number;
-  }): Task {
-    const task = new Task(taskData);
-    this.state.tasks.push(task);
-    return task;
-  }
-
-  public updateTask(taskId: string, updates: Partial<{
-    title: string;
-    description: string;
-    priority: TaskPriority;
-    status: TaskStatus;
-    tags: string[];
-    estimatedTime: number;
-    actualTime: number;
-  }>): Task | null {
-    const task = this.getTaskById(taskId);
-    if (!task) return null;
-
-    if (updates.title) task.setTitle(updates.title);
-    if (updates.description) task.setDescription(updates.description);
-    if (updates.priority) task.setPriority(updates.priority);
-    if (updates.status) task.setStatus(updates.status);
-    if (updates.tags) task.setTags(updates.tags);
-    if (updates.estimatedTime) task.setEstimatedTime(updates.estimatedTime);
-    if (updates.actualTime) task.setActualTime(updates.actualTime);
-
-    return task;
-  }
-
-  public deleteTask(taskId: string): boolean {
-    const index = this.state.tasks.findIndex(task => task.getId() === taskId);
-    if (index === -1) return false;
-    
-    this.state.tasks.splice(index, 1);
-    if (this.state.selectedTaskId === taskId) {
-      this.state.selectedTaskId = null;
+export const useTaskStore = create<TaskState>((set, get) => ({
+  tasks: [],
+  filter: {
+    search: '',
+  },
+  implementation: {
+    getTasks: () => get().tasks,
+    getFilteredTasks: () => {
+      const { tasks, filter } = get()
+      return tasks.filter(task => {
+        if (filter.search && !task.getTitle().toLowerCase().includes(filter.search.toLowerCase())) {
+          return false
+        }
+        if (filter.status && task.getStatus() !== filter.status) {
+          return false
+        }
+        if (filter.priority && task.getPriority() !== filter.priority) {
+          return false
+        }
+        if (filter.tags && filter.tags.length > 0) {
+          const taskTags = task.getTags()
+          if (!filter.tags.some(tag => taskTags.includes(tag))) {
+            return false
+          }
+        }
+        return true
+      })
+    },
+    addTask: async (taskData: Partial<Task>) => {
+      const task = new Task({
+        title: taskData.getTitle?.() || '',
+        description: taskData.getDescription?.() || '',
+        status: taskData.getStatus?.() || TaskStatus.TODO,
+        priority: taskData.getPriority?.() || TaskPriority.MEDIUM,
+        tags: taskData.getTags?.() || [],
+        estimatedTime: taskData.getEstimatedTime?.(),
+      })
+      
+      await DatabaseService.addTask(task)
+      await ActivityLogService.logActivity('create_task', { taskId: task.getId() })
+      
+      set(state => ({
+        tasks: [...state.tasks, task]
+      }))
+    },
+    updateTask: async (taskId: string, taskData: Partial<Task>) => {
+      await DatabaseService.updateTask(taskId, taskData)
+      await ActivityLogService.logActivity('update_task', { taskId })
+      
+      set(state => ({
+        tasks: state.tasks.map(task => 
+          task.getId() === taskId ? { ...task, ...taskData } : task
+        )
+      }))
+    },
+    deleteTask: async (taskId: string) => {
+      await DatabaseService.deleteTask(taskId)
+      await ActivityLogService.logActivity('delete_task', { taskId })
+      
+      set(state => ({
+        tasks: state.tasks.filter(task => task.getId() !== taskId)
+      }))
+    },
+    setFilter: (filter: Partial<TaskState['filter']>) => {
+      set(state => ({
+        filter: { ...state.filter, ...filter }
+      }))
+    },
+    loadTasks: async () => {
+      const tasks = await DatabaseService.getTasks()
+      set({ tasks })
     }
-    return true;
   }
-
-  public getTaskById(taskId: string): Task | null {
-    return this.state.tasks.find(task => task.getId() === taskId) || null;
-  }
-
-  // Filtering and Selection
-  public setFilter(filter: TaskState['filter']): void {
-    this.state.filter = filter;
-  }
-
-  public getFilteredTasks(): Task[] {
-    return this.state.tasks.filter(task => {
-      const { status, priority, tags } = this.state.filter;
-      if (status && task.getStatus() !== status) return false;
-      if (priority && task.getPriority() !== priority) return false;
-      if (tags?.length && !tags.some(tag => task.getTags().includes(tag))) return false;
-      return true;
-    });
-  }
-
-  public setSelectedTask(taskId: string | null): void {
-    this.state.selectedTaskId = taskId;
-  }
-
-  public getSelectedTask(): Task | null {
-    return this.state.selectedTaskId 
-      ? this.getTaskById(this.state.selectedTaskId)
-      : null;
-  }
-
-  // Analytics
-  public getEfficiencyScore(timeframe: 'daily' | 'weekly' | 'monthly' | 'yearly'): number {
-    const now = new Date();
-    const tasks = this.state.tasks.filter(task => {
-      const completedAt = task.getCompletedAt();
-      if (!completedAt) return false;
-
-      switch (timeframe) {
-        case 'daily':
-          return completedAt.getDate() === now.getDate();
-        case 'weekly':
-          const weekAgo = new Date(now.setDate(now.getDate() - 7));
-          return completedAt >= weekAgo;
-        case 'monthly':
-          return completedAt.getMonth() === now.getMonth();
-        case 'yearly':
-          return completedAt.getFullYear() === now.getFullYear();
-      }
-    });
-
-    if (tasks.length === 0) return 0;
-
-    const efficiencyScores = tasks.map(task => ({
-      score: task.calculateEfficiency(),
-      priority: task.getPriority()
-    }));
-
-    // Weight by priority
-    const priorityWeights = {
-      [TaskPriority.LOW]: 1,
-      [TaskPriority.MEDIUM]: 2,
-      [TaskPriority.HIGH]: 3,
-      [TaskPriority.CRITICAL]: 4
-    };
-
-    const weightedSum = efficiencyScores.reduce((sum, { score, priority }) => 
-      sum + (score * priorityWeights[priority]), 0);
-    const weightSum = efficiencyScores.reduce((sum, { priority }) => 
-      sum + priorityWeights[priority], 0);
-
-    return weightedSum / weightSum;
-  }
-
-  // Serialization
-  public toJSON(): Record<string, any> {
-    return {
-      tasks: this.state.tasks.map(task => task.toJSON()),
-      selectedTaskId: this.state.selectedTaskId,
-      filter: this.state.filter
-    };
-  }
-
-  public loadFromJSON(data: Record<string, any>): void {
-    this.state.tasks = data.tasks.map((taskData: any) => Task.fromJSON(taskData));
-    this.state.selectedTaskId = data.selectedTaskId;
-    this.state.filter = data.filter;
-  }
-}
-
-// Create the Zustand store
-export const useTaskStore = create<{
-  implementation: TaskStoreImplementation;
-}>((set) => ({
-  implementation: new TaskStoreImplementation()
-}));
+}))

@@ -56,6 +56,16 @@ const createTray = () => {
 };
 
 const registerShortcuts = () => {
+  // Quick add task - Cmd/Ctrl+Shift+A
+  globalShortcut.register('CommandOrControl+Shift+A', () => {
+    mainWindow?.webContents.send('quick-add-task');
+  });
+
+  // Toggle timer - Cmd/Ctrl+Shift+T
+  globalShortcut.register('CommandOrControl+Shift+T', () => {
+    mainWindow?.webContents.send('toggle-timer');
+  });
+
   // Global shortcut to toggle window visibility
   globalShortcut.register('Alt+Shift+T', () => {
     if (mainWindow?.isVisible()) {
@@ -79,6 +89,13 @@ const createMenu = () => {
       label: 'File',
       submenu: [
         {
+          label: 'Quick Add Task',
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click: () => {
+            mainWindow?.webContents.send('quick-add-task');
+          }
+        },
+        {
           label: 'Export Tasks...',
           accelerator: 'CmdOrCtrl+E',
           click: () => {
@@ -87,6 +104,18 @@ const createMenu = () => {
         },
         { type: 'separator' },
         { role: 'quit' }
+      ]
+    },
+    {
+      label: 'Timer',
+      submenu: [
+        {
+          label: 'Toggle Timer',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: () => {
+            mainWindow?.webContents.send('toggle-timer');
+          }
+        }
       ]
     },
     {

@@ -5,6 +5,8 @@ interface ElectronAPI {
   onOpenExportDialog: (callback: () => void) => () => void;
   onStartTimer: (callback: () => void) => () => void;
   onToggleTimer: (callback: () => void) => () => void;
+  onQuickAddTask: (callback: () => void) => () => void;
+  onToggleWindow: (callback: () => void) => () => void;
 }
 
 declare global {
@@ -38,6 +40,14 @@ class PreloadScript {
       onToggleTimer: (callback: () => void) => {
         ipcRenderer.on('toggle-timer', callback);
         return () => ipcRenderer.removeListener('toggle-timer', callback);
+      },
+      onQuickAddTask: (callback: () => void) => {
+        ipcRenderer.on('quick-add-task', callback);
+        return () => ipcRenderer.removeListener('quick-add-task', callback);
+      },
+      onToggleWindow: (callback: () => void) => {
+        ipcRenderer.on('toggle-window', callback);
+        return () => ipcRenderer.removeListener('toggle-window', callback);
       }
     });
   }
